@@ -3,7 +3,6 @@
 import pygame
 from pygame.locals import *
 from sys import exit
-from pylab import *
 import numpy as np
 
 def xy_rotate(x, y, xcen, ycen, phi):
@@ -19,7 +18,6 @@ def gauss_2d(x, y, par):
 	r_ell_sq = ((xnew**2)*par[4] + (ynew**2)/par[4]) / np.abs(par[1])**2
 	return par[0] * np.exp(-0.5*r_ell_sq)
 
-#-------------------------------------------------------------
 def lq_nie(x1,x2,lpar):
 	xc1 = lpar[0]
 	xc2 = lpar[1]
@@ -77,9 +75,8 @@ def lq_nie(x1,x2,lpar):
 	res1 = (a1*cosa-a2*sina)*re
 	res2 = (a2*cosa+a1*sina)*re
 	return res1,res2,mu
-#--------------------------------------------------------------------
-def lensed_images(xc,yc,nnn):
-#-------------------------------------------------------------------------------
+
+def lensed_images_1(xc,yc,nnn):
 	boxsize = 4.0
 	dsx = boxsize/nnn
 	#al1,al2,ka,shi,sh2,mua = lensing_signals_a(kas,aio[0],aio[1],dsx)
@@ -90,7 +87,6 @@ def lensed_images(xc,yc,nnn):
 	g_axrat = 1.0 # minor-to-major axis ratio
 	g_pa = 0.0	  # major-axis position angle (degrees) c.c.w. from x axis
 	gpar = np.asarray([g_amp, g_sig, g_xcen, g_ycen, g_axrat, g_pa])
-#----------------------------------------------------------------------
 
 	xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
 	xi2 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
@@ -99,9 +95,6 @@ def lensed_images(xc,yc,nnn):
 	lpar = np.asarray([0.0,0.0,0.7,0.1,1.0,0.0])
 	al1,al2,mu = lq_nie(xi1,xi2,lpar)
 
-	glpar = np.asarray([1.0,0.5,0.0,0.0,0.7,0.0])
-	g_lens = gauss_2d(xi1,xi2,glpar)
-
 	g_image = gauss_2d(xi1,xi2,gpar)
 
 	yi1 = xi1-al1
@@ -109,12 +102,37 @@ def lensed_images(xc,yc,nnn):
 
 	g_lensimage = gauss_2d(yi1,yi2,gpar)
 
-	return g_image,g_lensimage,g_lens
+	return g_image,g_lensimage
+def lensed_images_2(nnn):
+	boxsize = 4.0
+	dsx = boxsize/nnn
 
+	xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
+	xi2 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
+	xi1,xi2 = np.meshgrid(xi1,xi2)
+
+	lpar = np.asarray([0.0,0.0,0.7,0.1,1.0,0.0])
+	al1,al2,mu = lq_nie(xi1,xi2,lpar)
+	yi1 =xi1-al1
+	yi2 =xi2-al2
+
+	glpar = np.asarray([1.0,0.5,0.0,0.0,0.7,0.0])
+	g_lens = gauss_2d(xi1,xi2,glpar)
+
+	return g_lens,mu,yi1,yi2
+
+def find_critical_curve(mu):
+	rows,cols = np.indices(np.shape(mu))
+	cdtn = np.sign(mu)*(np.sign(mu[rows-1,cols])+np.sign(mu[rows,cols-1])+np.sign(mu[(rows+1)%len(rows),cols])+np.sign(mu[rows,(cols+1)%len(cols)]))
+
+	res = mu*0
+	res[cdtn<4] = 1
+	res[cdtn>=4] = 0
+
+	return res
 
 def main():
 	nnn = 512
-
 	pygame.init()
 
 	screen = pygame.display.set_mode((nnn, nnn), 0, 32)
@@ -126,6 +144,14 @@ def main():
 	base1 = np.zeros((nnn,nnn,3),'uint8')
 	base2 = np.zeros((nnn,nnn,3),'uint8')
 
+	g_lens,mu,yi1,yi2 = lensed_images_2(nnn)
+
+	del yi1,yi2,mu
+
+	base0[:,:,0] = g_lens*256
+	base0[:,:,1] = g_lens*128
+	base0[:,:,2] = g_lens*0
+
 	while True:
 		for event in pygame.event.get():
 			if event.type == QUIT:
@@ -135,11 +161,7 @@ def main():
 		x-= mouse_cursor.get_width() / 2
 		y-= mouse_cursor.get_height() / 2
 
-		g_image,g_lensimage,g_lens = lensed_images(x,y,nnn)
-
-		base0[:,:,0] = g_lens*256
-		base0[:,:,1] = g_lens*128
-		base0[:,:,2] = g_lens*0
+		g_image,g_lensimage = lensed_images_1(x,y,nnn)
 
 		base1[:,:,0] = g_image*256
 		base1[:,:,1] = g_image*256
@@ -148,14 +170,12 @@ def main():
 		base2[:,:,0] = g_lensimage*102
 		base2[:,:,1] = g_lensimage*178
 		base2[:,:,2] = g_lensimage*256
-		#pygame.surfarray.blit_array(mouse_cursor,base2)
-		#wf = base1+base2
-		#wf[wf>8] = 0
-		#wf[wf<=8] = 255
 
-		#base0 = wf
+		wf = base1+base2
+		wf[wf<=200] = 1
+		wf[wf>200] = 0
 
-		base = base0+(base1+base2)
+		base = wf*base0+(base1+base2)
 		pygame.surfarray.blit_array(mouse_cursor,base)
 
 		screen.blit(mouse_cursor, (0, 0))
