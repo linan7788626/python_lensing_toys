@@ -3,7 +3,6 @@
 import pygame
 from pygame.locals import *
 from sys import exit
-from pylab import *
 import numpy as np
 
 import ctypes as ct
@@ -172,19 +171,6 @@ def find_critical_curve(mu):
 
 	return res
 
-import scipy.interpolate as si
-
-def mapping_on_kth_plane(img_in,xi1,xi2,yi1,yi2,yif1,yif2,muf):
-	ya1 = np.hstack([yi1.flat,yif1.flat])
-	ya2 = np.hstack([yi2.flat,yif2.flat])
-	mua = np.hstack([img_in.flat,muf.flat])
-	#ya1 = np.array(yif1.flat)
-	#ya2 = np.array(yif2.flat)
-	#mua = np.array(muf.flat)
-	points = np.array([ya1,ya2])
-	res = si.griddata(points.T, mua, (xi1,xi2), method='linear')
-	return res
-
 def refine_critical(critical,xi1,xi2,dsx,nfiner=8):
 	x1tmp0 = xi1[critical>0]
 	yift1 = np.zeros((len(x1tmp0),nfiner,nfiner))
@@ -218,7 +204,7 @@ def main():
 	pygame.init()
 
 	screen = pygame.display.set_mode((nnn, nnn), 0, 32)
-	pygame.display.set_caption("Gravitational Lensing Toy!")
+	pygame.display.set_caption("Gravitational Lensing Toy")
 
 	mouse_cursor = pygame.Surface((nnn,nnn))
 
