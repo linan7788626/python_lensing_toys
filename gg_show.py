@@ -76,24 +76,15 @@ def lq_nie(x1,x2,lpar):
 	res2 = (a2*cosa+a1*sina)*re
 	return res1,res2,mu
 
-def lensed_images_1(xc,yc,nnn):
+def lensed_images(nnn,gpar,lpar,lpars):
+
+
 	boxsize = 4.0
 	dsx = boxsize/nnn
-	#al1,al2,ka,shi,sh2,mua = lensing_signals_a(kas,aio[0],aio[1],dsx)
-	g_amp = 1.0   # peak brightness value
-	g_sig = 0.1  # Gaussian "sigma" (i.e., size)
-	g_xcen = yc*2.0/nnn  # x position of center
-	g_ycen = xc*2.0/nnn  # y position of center
-	g_axrat = 1.0 # minor-to-major axis ratio
-	g_pa = 0.0	  # major-axis position angle (degrees) c.c.w. from x axis
-	gpar = np.asarray([g_amp, g_sig, g_xcen, g_ycen, g_axrat, g_pa])
-
 	xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
 	xi2 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
 	xi1,xi2 = np.meshgrid(xi1,xi2)
 
-	lpar = np.asarray([0.0,0.0,0.7,0.1,1.0,0.0])
-	lpars = np.asarray([0.77,0.7,0.9999999999,0.000000001,0.1,0.0])
 	al1,al2,mu = lq_nie(xi1,xi2,lpar)
 	al1s,al2s,mus = lq_nie(xi1,xi2,lpars)
 
@@ -106,7 +97,7 @@ def lensed_images_1(xc,yc,nnn):
 
 	return g_image,g_lensimage
 
-def lensed_images_2(nnn):
+def lens_galaxies(nnn,glpar,glpars):
 	boxsize = 4.0
 	dsx = boxsize/nnn
 
@@ -114,18 +105,11 @@ def lensed_images_2(nnn):
 	xi2 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
 	xi1,xi2 = np.meshgrid(xi1,xi2)
 
-	lpar = np.asarray([0.0,0.0,0.7,0.1,1.0,0.0])
-	al1,al2,mu = lq_nie(xi1,xi2,lpar)
-	yi1 =xi1-al1
-	yi2 =xi2-al2
-
-	glpar = np.asarray([1.0,0.5,0.0,0.0,0.7,0.0])
-	glpars = np.asarray([0.4,0.5*0.1,0.77,0.70,0.999999999,0.0])
 	g_lens = gauss_2d(xi1,xi2,glpar)
 	g_lens_s = gauss_2d(xi1,xi2,glpars)
 	g_lens = g_lens + g_lens_s
 
-	return g_lens,mu,yi1,yi2
+	return g_lens
 
 def find_critical_curve(mu):
 	rows,cols = np.indices(np.shape(mu))
@@ -146,13 +130,63 @@ def main():
 
 	mouse_cursor = pygame.Surface((nnn,nnn))
 
+	#----------------------------------------------------
+	# lens parameters for main halo
+	xlc0 = 0.0
+	ylc0 = 0.0
+	ql0 = 0.7
+	rc0 = 0.1
+	re0 = 1.0
+	phi0 = 0.0
+	#----------------------------------------------------
+	# lens parameters for subhalo
+	xlcs = 0.7
+	ylcs = 0.77
+	qls = 0.999999999
+	rcs = 0.000000001
+	res = 0.1
+	phis = 0.0
+
+	#----------------------------------------------------
+	# parameters of NIE model (lens model, deflection angles)
+	#----------------------------------------------------
+	# 1, y position of center
+	# 2, x position of center
+	# 3, minor-to-major axis ratio
+	# 4, size of flat core
+	# 5, Einstein radius (lensing strength)
+	# 6, major-axis position angle (degrees) c.c.w. from y axis
+	lpar =  np.asarray([ylc0,xlc0,ql0,rc0,re0,phi0])
+	lpars = np.asarray([ylcs,xlcs,qls,rcs,res,phis])
+
+
+	#----------------------------------------------------
+	# luminosity parameters for main halo
+	ap0 = 1.0
+	l_sig0 = 0.5
+	#----------------------------------------------------
+	# luminosity parameters for subhalo
+	aps = 0.4
+	l_sigs = 0.05
+	#----------------------------------------------------
+	# Parameters of Gaussian model (luminosity distribution of lenses)
+	#----------------------------------------------------
+	# 1, peak brightness value
+	# 2, Gaussian "sigma" (i.e., size)
+	# 3, y position of center
+	# 4, x position of center
+	# 5, minor-to-major axis ratio
+	# 6, major-axis position angle (degrees) c.c.w. from y axis
+
+	glpar  = np.asarray([ap0,l_sig0,ylc0,xlc0,ql0,phi0])
+	glpars = np.asarray([aps,l_sigs,ylcs,xlcs,qls,phis])
+	#----------------------------------------------------
+
 	base0 = np.zeros((nnn,nnn,3),'uint8')
 	base1 = np.zeros((nnn,nnn,3),'uint8')
 	base2 = np.zeros((nnn,nnn,3),'uint8')
 
-	g_lens,mu,yi1,yi2 = lensed_images_2(nnn)
-
-	del yi1,yi2,mu
+	g_lens = lens_galaxies(nnn,glpar,glpars)
 
 	base0[:,:,0] = g_lens*256
 	base0[:,:,1] = g_lens*128
@@ -167,7 +201,19 @@ def main():
 		x-= mouse_cursor.get_width() / 2
 		y-= mouse_cursor.get_height() / 2
 
-		g_image,g_lensimage = lensed_images_1(x,y,nnn)
+		#----------------------------------------------
+		#parameters of source galaxies.
+		#----------------------------------------------
+		g_amp = 1.0			# peak brightness value
+		g_sig = 0.01			# Gaussian "sigma" (i.e., size)
+		g_ycen = y*2.0/nnn  # y position of center
+		g_xcen = x*2.0/nnn  # x position of center
+		g_axrat = 1.0		# minor-to-major axis ratio
+		g_pa = 0.0			# major-axis position angle (degrees) c.c.w. from y axis
+		gpar = np.asarray([g_amp, g_sig, g_ycen, g_xcen, g_axrat, g_pa])
+		#----------------------------------------------
+
+		g_image,g_lensimage = lensed_images(nnn,gpar,lpar,lpars)
 
 		base1[:,:,0] = g_image*256
 		base1[:,:,1] = g_image*256
