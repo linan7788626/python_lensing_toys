@@ -81,7 +81,7 @@ def lensed_images_1(xc,yc,nnn):
 	dsx = boxsize/nnn
 	#al1,al2,ka,shi,sh2,mua = lensing_signals_a(kas,aio[0],aio[1],dsx)
 	g_amp = 1.0   # peak brightness value
-	g_sig = 0.01  # Gaussian "sigma" (i.e., size)
+	g_sig = 0.1  # Gaussian "sigma" (i.e., size)
 	g_xcen = yc*2.0/nnn  # x position of center
 	g_ycen = xc*2.0/nnn  # y position of center
 	g_axrat = 1.0 # minor-to-major axis ratio
@@ -178,10 +178,16 @@ def main():
 		base2[:,:,2] = g_lensimage*256
 
 		wf = base1+base2
-		wf[wf<=200] = 1
-		wf[wf>200] = 0
 
-		base = wf*base0+(base1+base2)
+		idx1 = wf>=base0
+		idx2 = wf<base0
+
+		base = base0*0
+		base[idx1] = wf[idx1]
+		base[idx2] = base0[idx2]
+
+
+		#base = wf*base0+(base1+base2)
 		pygame.surfarray.blit_array(mouse_cursor,base)
 
 		screen.blit(mouse_cursor, (0, 0))
