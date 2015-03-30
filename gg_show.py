@@ -76,14 +76,7 @@ def lq_nie(x1,x2,lpar):
 	res2 = (a2*cosa+a1*sina)*re
 	return res1,res2,mu
 
-def lensed_images(nnn,gpar,lpar,lpars):
-
-
-	boxsize = 4.0
-	dsx = boxsize/nnn
-	xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
-	xi2 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
-	xi1,xi2 = np.meshgrid(xi1,xi2)
+def lensed_images(xi1,xi2,gpar,lpar,lpars):
 
 	al1,al2,mu = lq_nie(xi1,xi2,lpar)
 	al1s,al2s,mus = lq_nie(xi1,xi2,lpars)
@@ -97,13 +90,7 @@ def lensed_images(nnn,gpar,lpar,lpars):
 
 	return g_image,g_lensimage
 
-def lens_galaxies(nnn,glpar,glpars):
-	boxsize = 4.0
-	dsx = boxsize/nnn
-
-	xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
-	xi2 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
-	xi1,xi2 = np.meshgrid(xi1,xi2)
+def lens_galaxies(xi1,xi2,glpar,glpars):
 
 	g_lens = gauss_2d(xi1,xi2,glpar)
 	g_lens_s = gauss_2d(xi1,xi2,glpars)
@@ -121,12 +108,31 @@ def find_critical_curve(mu):
 
 	return res
 
+def keyPressed(inputKey):
+    keysPressed = pygame.key.get_pressed()
+    if keysPressed[inputKey]:
+        return True
+    else:
+        return False
+
+
 def main():
+
+
 	nnn = 512
+	boxsize = 4.0
+	dsx = boxsize/nnn
+	xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
+	xi2 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
+	xi1,xi2 = np.meshgrid(xi1,xi2)
+
 	pygame.init()
+	FPS = 30
+	fpsClock = pygame.time.Clock()
 
 	screen = pygame.display.set_mode((nnn, nnn), 0, 32)
-	pygame.display.set_caption("Gravitational Lensing Toy!")
+
+	pygame.display.set_caption("Gravitational Lensing Toy")
 
 	mouse_cursor = pygame.Surface((nnn,nnn))
 
@@ -186,26 +192,91 @@ def main():
 	base1 = np.zeros((nnn,nnn,3),'uint8')
 	base2 = np.zeros((nnn,nnn,3),'uint8')
 
-	g_lens = lens_galaxies(nnn,glpar,glpars)
+	g_lens = lens_galaxies(xi1,xi2,glpar,glpars)
 
 	base0[:,:,0] = g_lens*256
 	base0[:,:,1] = g_lens*128
 	base0[:,:,2] = g_lens*0
+	x = 0
+	y = 0
+	step = 1
+	gr_sig = 0.01
+
+	LeftButton=0
+
 
 	while True:
 		for event in pygame.event.get():
 			if event.type == QUIT:
 				exit()
+			if event.type == MOUSEMOTION:
 
-		x, y = pygame.mouse.get_pos()
-		x-= mouse_cursor.get_width() / 2
-		y-= mouse_cursor.get_height() / 2
+				if event.buttons[LeftButton]:
+					rel = event.rel
+					x += rel[0]
+					y += rel[1]
+
+			#----------------------------------------------
+			if event.type == pygame.MOUSEBUTTONDOWN:
+				if event.button == 4:
+					gr_sig -= 0.01
+					if gr_sig <0.01:
+						gr_sig = 0.01
+
+				elif event.button == 5:
+					gr_sig += 0.01
+					if gr_sig >0.1:
+						gr_sig = 0.1
+
+
+
+		keys = pygame.key.get_pressed()  #checking pressed keys
+		if keys[pygame.K_RIGHT]:
+			x += step
+			if x > 500:
+				x = 500
+		if keys[pygame.K_LSHIFT] & keys[pygame.K_RIGHT]:
+			x += 30*step
+
+		if keys[pygame.K_LEFT]:
+			x -= step
+			if x < -500:
+				x = -500
+
+		if keys[pygame.K_LSHIFT] & keys[pygame.K_LEFT]:
+			x -= 30*step
+
+		if keys[pygame.K_UP]:
+			y -= step
+			if y < -500 :
+				y = -500
+		if keys[pygame.K_LSHIFT] & keys[pygame.K_UP]:
+			y -= 30*step
+
+		if keys[pygame.K_DOWN]:
+			y += step
+			if y > 500 :
+				y = 500
+		if keys[pygame.K_LSHIFT] & keys[pygame.K_DOWN]:
+			y += 30*step
+
+
+		#----------------------------------------------
+		if keys[pygame.K_MINUS]:
+			gr_sig -= 0.01
+			if gr_sig <0.01:
+				gr_sig = 0.01
+
+		if keys[pygame.K_EQUALS]:
+			gr_sig += 0.01
+			if gr_sig >0.1:
+				gr_sig = 0.1
 
 		#----------------------------------------------
 		#parameters of source galaxies.
 		#----------------------------------------------
 		g_amp = 1.0			# peak brightness value
-		g_sig = 0.01			# Gaussian "sigma" (i.e., size)
+		g_sig = gr_sig			# Gaussian "sigma" (i.e., size)
 		g_ycen = y*2.0/nnn  # y position of center
 		g_xcen = x*2.0/nnn  # x position of center
 		g_axrat = 1.0		# minor-to-major axis ratio
@@ -213,7 +284,8 @@ def main():
 		gpar = np.asarray([g_amp, g_sig, g_ycen, g_xcen, g_axrat, g_pa])
 		#----------------------------------------------
 
-		g_image,g_lensimage = lensed_images(nnn,gpar,lpar,lpars)
+
+		g_image,g_lensimage = lensed_images(xi1,xi2,gpar,lpar,lpars)
 
 		base1[:,:,0] = g_image*256
 		base1[:,:,1] = g_image*256
@@ -236,8 +308,15 @@ def main():
 		#base = wf*base0+(base1+base2)
 		pygame.surfarray.blit_array(mouse_cursor,base)
 
+
 		screen.blit(mouse_cursor, (0, 0))
+
+		#font=pygame.font.SysFont(None,30)
+		#text = font.render("( "+str(x)+", "+str(-y)+" )", True, (255, 255, 255))
+		#screen.blit(text,(10, 10))
 		pygame.display.update()
+		fpsClock.tick(FPS)
+
 
 if __name__ == '__main__':
 	main()
