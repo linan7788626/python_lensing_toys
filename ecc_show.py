@@ -8,40 +8,22 @@ import numpy as np
 import scipy.interpolate as si
 import scipy.ndimage.filters as snf
 
-def mapping_on_kth_plane(img_in,xi1,xi2,yi1,yi2,yif1,yif2,muf):
-    ya1 = np.hstack([yi1.flat,yif1.flat])
-    ya2 = np.hstack([yi2.flat,yif2.flat])
-    mua = np.hstack([img_in.flat,muf.flat])
-    #ya1 = np.array(yif1.flat)
-    #ya2 = np.array(yif2.flat)
-    #mua = np.array(muf.flat)
-    points = np.array([ya1,ya2])
-    res = si.griddata(points.T, mua, (xi1,xi2), method='linear')
-    return res
+import ctypes as ct
+fcic = ct.CDLL("./libfcic.so")
+fcic.forward_cic.argtypes = [np.ctypeslib.ndpointer(dtype =  ct.c_double),\
+                             np.ctypeslib.ndpointer(dtype =  ct.c_double), \
+                             np.ctypeslib.ndpointer(dtype =  ct.c_double), \
+                             ct.c_double,ct.c_double,ct.c_int,ct.c_int,ct.c_int,\
+                             np.ctypeslib.ndpointer(dtype = ct.c_double)]
+fcic.forward_cic.restype  = ct.c_void_p
 
-def source_plane_finer(xi1,xi2):
-
-    lpar = np.asarray([0.0,0.0,0.7,0.0,1.0,0.0])
-    al1,al2,mu = lq_nie(xi1,xi2,lpar)
-    yi1 =xi1-al1
-    yi2 =xi2-al2
-
-    return mu,yi1,yi2
-
-def refine_critical(critical,xi1,xi2,dsx,nfiner=16):
-    x1tmp0 = xi1[critical>0]
-    yift1 = np.zeros((len(x1tmp0),nfiner,nfiner))
-    yift2 = np.zeros((len(x1tmp0),nfiner,nfiner))
-    muf = np.zeros((len(x1tmp0),nfiner,nfiner))
-    dsf = dsx/nfiner
-    for i in xrange(nfiner):
-        for j in xrange(nfiner):
-            x1tmp = xi1[critical>0]+(dsf*(1-nfiner)*0.5)+dsf*i
-            x2tmp = xi2[critical>0]+(dsf*(1-nfiner)*0.5)+dsf*j
-
-            muf[:,i,j],yift1[:,i,j],yift2[:,i,j] = source_plane_finer(x1tmp,x2tmp)
-
-    return np.ones((len(x1tmp0),nfiner,nfiner)),yift1,yift2
+def call_forward_cic(nx1,nx2,boxsize,yif1,yif2):
+    img_in = np.array(np.ones(len(yif1)),dtype=ct.c_double)
+    yif1 = np.array(yif1,dtype=ct.c_double)
+    yif2 = np.array(yif2,dtype=ct.c_double)
+    img_out = np.zeros((nx1,nx2))
+    fcic.forward_cic(img_in,yif1,yif2,ct.c_double(boxsize),ct.c_double(boxsize),ct.c_int(nx1),ct.c_int(nx2),ct.c_int(len(yif1)),img_out)
+    return img_out.T
 
 def xy_rotate(x, y, xcen, ycen, phi):
 
@@ -114,6 +96,35 @@ def lq_nie(x1,x2,lpar):
     res2 = (a2*cosa+a1*sina)*re
     return res1,res2#,jacobian
 
+#--------------------------------------------------------------------
+def source_plane_finer(xi1,xi2,lpar,lpars):
+
+    al1,al2 = lq_nie(xi1,xi2,lpar)
+    al1s,al2s = lq_nie(xi1,xi2,lpars)
+    #print np.min(jcbs)
+    ai1 = al1+al1s
+    ai2 = al2+al2s
+
+    yi1 = xi1-ai1
+    yi2 = xi2-ai2
+
+    return yi1,yi2
+
+def refine_critical(lpar,lpars,critical,xi1,xi2,dsx,nfiner=8):
+    x1tmp0 = xi1[critical>0]
+    yift1 = np.zeros((len(x1tmp0),nfiner,nfiner))
+    yift2 = np.zeros((len(x1tmp0),nfiner,nfiner))
+    dsf = dsx/nfiner/2
+    for i in xrange(nfiner):
+        for j in xrange(nfiner):
+            x1tmp = xi1[critical>0]+(dsf*(1-nfiner)*0.5)+dsf*i
+            x2tmp = xi2[critical>0]+(dsf*(1-nfiner)*0.5)+dsf*j
+
+            yift1[:,i,j],yift2[:,i,j] = source_plane_finer(x1tmp,x2tmp,lpar,lpars)
+
+    return yift1,yift2
+
+
 def lensed_images(xi1,xi2,gpar,lpar,lpars):
 
     dsx = xi1[1,1]-xi1[0,0]
@@ -135,7 +146,7 @@ def lensed_images(xi1,xi2,gpar,lpar,lpars):
 
     g_lensimage = gauss_2d(yi1,yi2,gpar)
 
-    return g_image,g_lensimage,mu
+    return g_image,g_lensimage,mu,yi1,yi2
 
 def lens_galaxies(xi1,xi2,glpar,glpars):
 
@@ -165,6 +176,7 @@ def keyPressed(inputKey):
 
 def main():
     nnn = 256
+    nnw = 1024
     boxsize = 4.0
     dsx = boxsize/nnn
     xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
@@ -175,7 +187,8 @@ def main():
     FPS = 15
     fpsClock = pygame.time.Clock()
 
-    screen = pygame.display.set_mode((nnn, nnn), 0, 32)
+    screen = pygame.display.set_mode((nnw, nnw), pygame.RESIZABLE, 32)
+    #screen = pygame.display.set_mode((nnw, nnw), pygame.RESIZABLE| pygame.OPENGLBLIT | pygame.HWSURFACE | pygame.OPENGL | pygame.DOUBLEBUF)
 
     pygame.display.set_caption("Gravitational Lensing Toy")
 
@@ -244,6 +257,8 @@ def main():
 
     LeftButton=0
 
+    pygame.RESIZABLE
+
 
     while True:
         for event in pygame.event.get():
@@ -270,9 +285,9 @@ def main():
         if rotation[0] and buttonpress[0] and keys[pygame.K_e]:
             gr_pa=gr_pa+rotation[0]
 
-            gr_eq=gr_eq+rotation[1]*0.005
-            if gr_eq <= 0:
-                gr_eq = 0.3
+            gr_eq=gr_eq+rotation[1]*0.002
+            if gr_eq <= 0.1:
+                gr_eq = 0.1
             if gr_eq >= 1:
                 gr_eq = 1.0-delta
 
@@ -280,7 +295,7 @@ def main():
         #----------------------------------------------------
         if rotation[0] and buttonpress[2] and keys[pygame.K_s]:
 
-            rc0=rc0+rotation[0]*0.01
+            rc0=rc0+rotation[0]*0.002
 
             if rc0 <= 0:
                 rc0 = delta
@@ -291,11 +306,11 @@ def main():
             #if l_sig0 <= 0:
             #    l_sig0 = delta
 
-            re0=re0-rotation[1]*0.01
+            re0=re0-rotation[1]*0.005
             if re0 <= 0:
                 re0 = delta
 
-            l_sig0 = l_sig0-rotation[1]*0.01
+            l_sig0 = l_sig0-rotation[1]*0.005
             if l_sig0 <= 0:
                 l_sig0 = delta
 
@@ -306,9 +321,9 @@ def main():
         if rotation[0] and buttonpress[2] and keys[pygame.K_e]:
             phi0=phi0+rotation[0]
 
-            ql0=ql0+rotation[1]*0.01
-            if ql0 <= 0:
-                ql0 = 0.5
+            ql0=ql0+rotation[1]*0.002
+            if ql0 <= 0.3:
+                ql0 = 0.3
             if ql0 >= 1:
                 ql0 = 1.0-delta
 
@@ -328,7 +343,7 @@ def main():
         #----------------------------------------------
 
 
-        g_image,g_lensimage,mu = lensed_images(xi1,xi2,gpar,lpar,lpars)
+        g_image,g_lensimage,mu,yi1,yi2 = lensed_images(xi1,xi2,gpar,lpar,lpars)
         mu = 1.0/mu
 
         critical = find_critical_curve(mu)
@@ -345,7 +360,17 @@ def main():
         base2[:,:,1] = g_lensimage*178
         base2[:,:,2] = g_lensimage*256
 
-        wf = base1+base2+base3#+base4
+
+        yif1,yif2 = refine_critical(lpar,lpars,critical,xi1,xi2,dsx)
+        caustic = call_forward_cic(nnn,nnn,boxsize,yif1.flat,yif2.flat)
+        caustic[caustic>0]=1
+
+
+        base4[:,:,0] = caustic*0
+        base4[:,:,1] = caustic*255
+        base4[:,:,2] = caustic*0
+
+        wf = base1+base2+base3+base4
 
         idx1 = wf>=base0
         idx2 = wf<base0
@@ -359,12 +384,14 @@ def main():
         pygame.surfarray.blit_array(mouse_cursor,base)
 
 
-        screen.blit(mouse_cursor, (0, 0))
+        #screen.blit(pygame.transform.scale(mouse_cursor,(nnw,nnw)), (0, 0))
+        screen.blit(pygame.transform.scale(mouse_cursor,(nnw,nnw)), (0, 0))
 
         #font=pygame.font.SysFont(None,30)
         #text = font.render("( "+str(x)+", "+str(-y)+" )", True, (255, 255, 255))
         #screen.blit(text,(10, 10))
         pygame.display.update()
+        #pygame.display.flip()
         fpsClock.tick(FPS)
 
 
