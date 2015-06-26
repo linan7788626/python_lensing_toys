@@ -193,7 +193,8 @@ def build_polar_coor(r,phi):
 
 def main():
 	boxsize = 4.0
-	nnn = 512
+	nnn = 256
+	nnw = 1024
 	dsx = boxsize/nnn
 
 	xi1 = np.linspace(-boxsize/2.0,boxsize/2.0-dsx,nnn)+0.5*dsx
@@ -203,7 +204,7 @@ def main():
 
 	pygame.init()
 
-	screen = pygame.display.set_mode((nnn, nnn), 0, 32)
+	screen = pygame.display.set_mode((nnw, nnw), 0, 32)
 	pygame.display.set_caption("Gravitational Lensing Toy")
 
 	mouse_cursor = pygame.Surface((nnn,nnn))
@@ -256,7 +257,8 @@ def main():
 		base = base3+base4+(base1+base2)
 		pygame.surfarray.blit_array(mouse_cursor,base)
 
-		screen.blit(mouse_cursor, (0, 0))
+		#screen.blit(mouse_cursor, (0, 0))
+		screen.blit(pygame.transform.scale(mouse_cursor,(nnw,nnw)), (0, 0))
 		pygame.display.update()
 
 if __name__ == '__main__':

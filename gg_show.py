@@ -94,7 +94,7 @@ def lens_galaxies(xi1,xi2,glpar,glpars):
 
 	g_lens = gauss_2d(xi1,xi2,glpar)
 	g_lens_s = gauss_2d(xi1,xi2,glpars)
-	g_lens = g_lens + g_lens_s
+	g_lens = g_lens# + g_lens_s
 
 	return g_lens
 
@@ -150,7 +150,7 @@ def main():
 	ylcs = 0.77
 	qls = 0.999999999
 	rcs = 0.000000001
-	res = 0.1
+	res = 0.0
 	phis = 0.0
 
 	#----------------------------------------------------
@@ -200,7 +200,7 @@ def main():
 	x = 0
 	y = 0
 	step = 1
-	gr_sig = 0.01
+	gr_sig = 0.02
 
 	LeftButton=0
 

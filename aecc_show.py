@@ -5,8 +5,8 @@ from pygame.locals import *
 from sys import exit
 import numpy as np
 
-import scipy.interpolate as si
-import scipy.ndimage.filters as snf
+#import scipy.interpolate as si
+#import scipy.ndimage.filters as snf
 
 import ctypes as ct
 fcic = ct.CDLL("./libfcic.so")
