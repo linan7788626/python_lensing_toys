@@ -40,6 +40,31 @@ def gauss_2d(x, y, par):
     r_ell_sq = ((xnew**2)*par[2] + (ynew**2)/par[2]) / np.abs(par[4])**2
     return par[3] * np.exp(-0.5*r_ell_sq)
 
+def tophat_2d(x, y, par):
+    (xnew,ynew) = xy_rotate(x, y, par[0], par[1], par[5])
+    #r_ell_sq = np.sqrt(((xnew**2)*par[2] + (ynew**2)/par[2]) / np.abs(par[4])**2)
+    #r_ell_sq = np.sqrt((xnew-par[0])**2 + (ynew-par[1])**2)
+    r_ell = np.sqrt(((xnew**2)*par[2] + (ynew**2)/par[2]))
+    res = r_ell*0.0
+    res[r_ell>=par[4]] = -1.0
+    res[r_ell<par[4]] = 10000.0
+    #res[r_ell_sq>=par[4]] = 0
+    #print np.max(res)
+    return res
+
+    #(xnew,ynew) = xy_rotate(x, y, par[0], par[1], par[5])
+    #r_ell_sq = ((xnew**2)*par[2] + (ynew**2)/par[2]) / np.abs(par[4])**2
+    #return par[3] * np.exp(-5.5*r_ell_sq)
+
+def Ellipse(x0,y0,a,b,an):
+    npoints=100 #Number of points whicnh needs to construct the elipse
+    cos_a,sin_a=np.cos(an*np.pi/180),np.sin(an*np.pi/180)
+    the=np.linspace(0,2*np.pi,npoints)
+    #Here goes the general ellpse, x0, y0 is the origin of the ellipse in xy plane
+    X=a*np.cos(the)*cos_a-sin_a*b*np.sin(the)+x0
+    Y=a*np.cos(the)*sin_a+cos_a*b*np.sin(the)+y0
+    return np.array([X,Y]).T
+
 def lq_nie(x1,x2,lpar):
     xc1 = lpar[0]
     xc2 = lpar[1]
@@ -158,6 +183,16 @@ def find_critical_curve(mu):
     res[cdtn<4] = 1
     res[cdtn>=4] = 0
 
+    #import pylab as pl
+    #pl.figure()
+    #pl.contourf(mu)
+    #pl.colorbar()
+
+    #pl.figure()
+    #pl.contourf(res)
+    #pl.colorbar()
+    #pl.show()
+
     return res
 
 def keyPressed(inputKey):
@@ -175,6 +210,17 @@ def lens_images(xi1,xi2,gpar,gpars):
         g_lens_subs = gauss_2d(xi1,xi2,i)
         g_lens = g_lens + g_lens_subs
     return g_lens
+
+def mmbr_images(xi1,xi2,gpar,gpars):
+
+    g_lens = tophat_2d(xi1,xi2,gpar)
+    g_edge = find_critical_curve(g_lens)
+    for i in gpars:
+        g_lens_subs = tophat_2d(xi1,xi2,i)
+        g_edge_subs = find_critical_curve(g_lens_subs)
+        g_edge = g_edge+g_edge_subs
+    g_edge[g_edge>0.0] = 1.0
+    return g_edge
 
 def main():
     nnn = 256
@@ -197,6 +243,7 @@ def main():
     mouse_cursor = pygame.Surface((nnn,nnn))
 
 
+    baset = np.zeros((nnn,nnn,3),'uint8')
     base0 = np.zeros((nnn,nnn,3),'uint8')
     base1 = np.zeros((nnn,nnn,3),'uint8')
     base2 = np.zeros((nnn,nnn,3),'uint8')
@@ -263,8 +310,15 @@ def main():
     #---------------------------------------------------
 
     delta = 1e-8
+    #lineThickness = 1
 
     #LeftButton=0
+
+    ## Define some colors
+    #BLACK = (0, 0, 0)
+    #WHITE = (255, 255, 255)
+    #GREEN = (0, 255, 0)
+    #RED = (255, 0, 0)
 
     pygame.RESIZABLE
 
@@ -418,26 +472,31 @@ def main():
         g_xcen = x*2.0/nnn  # x position of center
         g_axrat = gr_eq       # minor-to-major axis ratio
         g_pa = gr_pa          # major-axis position angle (degrees) c.c.w. from y axis
-        spar = np.asarray([g_ycen, g_xcen, g_axrat,g_amp, g_sig,g_pa])
+        spar = np.asarray([g_ycen,g_xcen,g_axrat,g_amp,g_sig,g_pa])
         #----------------------------------------------
 
         g_lenses = lens_images(xi1,xi2,gpar,gpars)
+        g_shapes = mmbr_images(xi1,xi2,gpar,gpars)
+
+        baset[:,:,0] = g_shapes*255
+        baset[:,:,1] = g_shapes*255
+        baset[:,:,2] = g_shapes*255
 
         s_image,g_lensimage,mu,yi1,yi2 = lensed_images(xi1,xi2,spar,lpar,lpars)
         mu = 1.0/mu
 
 
-        base0[:,:,0] = g_lenses*256
-        base0[:,:,1] = g_lenses*128
+        base0[:,:,0] = g_lenses*255
+        base0[:,:,1] = g_lenses*127
         base0[:,:,2] = g_lenses*0
 
-        base1[:,:,0] = s_image*256
-        base1[:,:,1] = s_image*256
-        base1[:,:,2] = s_image*256
+        base1[:,:,0] = s_image*255
+        base1[:,:,1] = s_image*255
+        base1[:,:,2] = s_image*255
 
         base2[:,:,0] = g_lensimage*102
         base2[:,:,1] = g_lensimage*178
-        base2[:,:,2] = g_lensimage*256
+        base2[:,:,2] = g_lensimage*255
 
         critical = find_critical_curve(mu)
         base3[:,:,0] = critical*255
@@ -453,6 +512,9 @@ def main():
         base4[:,:,2] = caustic*0
 
         if keys[pygame.K_t]:
+            base = baset+base1+base2
+
+        elif keys[pygame.K_g]:
             wf = base0+base1+base2
 
             idx1 = wf>=base0
@@ -464,13 +526,9 @@ def main():
             wf = base1+base2+base3+base4
             base = wf
 
-
-
-
         pygame.surfarray.blit_array(mouse_cursor,base)
 
 
-        #screen.blit(pygame.transform.scale(mouse_cursor,(nnw,nnw)), (0, 0))
         screen.blit(pygame.transform.scale(mouse_cursor,(nnw,nnw)), (0, 0))
 
         #font=pygame.font.SysFont(None,30)
@@ -479,7 +537,6 @@ def main():
         pygame.display.update()
         #pygame.display.flip()
         fpsClock.tick(FPS)
-
 
 if __name__ == '__main__':
     main()
