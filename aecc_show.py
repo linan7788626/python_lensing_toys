@@ -33,10 +33,12 @@ def xy_rotate(x, y, xcen, ycen, phi):
     return (xnew,ynew)
 
 def gauss_2d(x, y, par):
+    #lgpars = np.asarray([ylcs,xlcs,qls,aps,l_sigs,phis])
+    #lgpars = np.asarray([aps,l_sigs,ylcs,xlcs,qls,phis])
 
-    (xnew,ynew) = xy_rotate(x, y, par[2], par[3], par[5])
-    r_ell_sq = ((xnew**2)*par[4] + (ynew**2)/par[4]) / np.abs(par[1])**2
-    return par[0] * np.exp(-0.5*r_ell_sq)
+    (xnew,ynew) = xy_rotate(x, y, par[0], par[1], par[5])
+    r_ell_sq = ((xnew**2)*par[2] + (ynew**2)/par[2]) / np.abs(par[4])**2
+    return par[3] * np.exp(-0.5*r_ell_sq)
 
 def lq_nie(x1,x2,lpar):
     xc1 = lpar[0]
@@ -173,6 +175,14 @@ def keyPressed(inputKey):
     else:
         return False
 
+#--------------------------------------------------------------------
+def mem_gals(xi1,xi2,lgpar,lgpars):
+
+    g_lens = gauss_2d(xi1,xi2,lgpar)
+    for i in lpars:
+        g_lens_subs = gauss_2d(xi1,xi2,lgpars[i])
+        g_lens = g_lens + g_lens_subs
+    return g_lens
 
 def main():
     nnn = 256
@@ -228,7 +238,8 @@ def main():
     # 5, minor-to-major axis ratio
     # 6, major-axis position angle (degrees) c.c.w. from y axis
 
-    glpars = np.asarray([aps,l_sigs,ylcs,xlcs,qls,phis])
+    #lgpars = np.asarray([aps,l_sigs,ylcs,xlcs,qls,phis])
+    lgpars = np.asarray([ylcs,xlcs,qls,aps,l_sigs,phis])
     #---------------------------------------------------
 
     base0 = np.zeros((nnn,nnn,3),'uint8')
@@ -269,14 +280,19 @@ def main():
         buttonpress=pygame.mouse.get_pressed()
         keys = pygame.key.get_pressed()  #checking pressed keys
 
+        #lgpars = np.asarray([aps,l_sigs,ylcs,xlcs,qls,phis])
+
         if buttonpress[2] and keys[pygame.K_EQUALS]:
             xlcs = (pos[0]*nnn/nnw-nnn/2.0)*dsx
             ylcs = (pos[1]*nnn/nnw-nnn/2.0)*dsx
             lpar_sub = np.asarray([ylcs,xlcs,qls,rcs,res,phis])
             lpars.append(lpar_sub)
+            #lgpar_sub = np.asarray([ylcs,xlcs,qls,aps,l_sigs,phis])
+            #lgpars.append(lgpar_sub)
         if buttonpress[2] and keys[pygame.K_MINUS]:
             if len(lpars) > 0:
                 del lpars[-1]
+                #del lgpars[-1]
         for i in xrange(len(lpars)):
             kp = "K_"+str(i+1)
             kpv = getattr(pygame, kp)
@@ -292,10 +308,26 @@ def main():
                 lpars[i][4]=lpars[i][4]-rotation[1]*0.005
                 if lpars[i][4] <= 0:
                     lpars[i][4] = delta
+                ##-----------------------------------------------------
+                #lgpars[i][3]=lgpars[i][3]+rotation[0]*0.002
+                #if lgpars[i][3] <= 0:
+                #    lgpars[i][3] = delta
+                #if lgpars[i][3] >= 1:
+                #    lgpars[i][3] = 1.0-delta
 
-            if rotation[0] and buttonpress[2] and keys[pygame.K_p] and keys[kpv] :
+                #lgpars[i][4]=lgpars[i][4]-rotation[1]*0.005
+                #if lgpars[i][4] <= 0:
+                #    lgpars[i][4] = delta
+                ##-----------------------------------------------------
+
+            if rotation[0] and buttonpress[2] and keys[pygame.K_w] and keys[kpv] :
                 lpars[i][1]=lpars[i][1]+rotation[0]*0.01
                 lpars[i][0]=lpars[i][0]+rotation[1]*0.01
+
+                ##-----------------------------------------------------
+                #lgpars[i][1]=lgpars[i][1]+rotation[0]*0.01
+                #lgpars[i][0]=lgpars[i][0]+rotation[1]*0.01
+                ##-----------------------------------------------------
 
             if rotation[0] and buttonpress[2] and keys[pygame.K_e] and keys[kpv] :
                 lpars[i][5]=lpars[i][5]+rotation[0]
@@ -305,6 +337,16 @@ def main():
                     lpars[i][2] = 0.3
                 if lpars[i][2] >= 1:
                     lpars[i][2] = 1.0-delta
+
+                ##-----------------------------------------------------
+                #lgpars[i][5]=lgpars[i][5]+rotation[0]
+
+                #lgpars[i][2]=lgpars[i][2]+rotation[1]*0.002
+                #if lgpars[i][2] <= 0.3:
+                #    lgpars[i][2] = 0.3
+                #if lgpars[i][2] >= 1:
+                #    lgpars[i][2] = 1.0-delta
+                ##-----------------------------------------------------
 
             #lpars[i] =  np.asarray([ylcs,xlcs,qls,rcs,res,phis])
 
@@ -316,7 +358,7 @@ def main():
             if gr_sig >= 1:
                 gr_sig = 1.0
 
-        if rotation[0] and buttonpress[0] and keys[pygame.K_p]:
+        if rotation[0] and buttonpress[0] and keys[pygame.K_w]:
             x += rotation[0]
             y += rotation[1]
 
@@ -352,7 +394,7 @@ def main():
             if l_sig0 <= 0:
                 l_sig0 = delta
 
-        if rotation[0] and buttonpress[2] and keys[pygame.K_p] and keys[pygame.K_0]:
+        if rotation[0] and buttonpress[2] and keys[pygame.K_w] and keys[pygame.K_0]:
             xlc0=xlc0+rotation[0]*0.01
             ylc0=ylc0+rotation[1]*0.01
 
@@ -377,7 +419,9 @@ def main():
         g_xcen = x*2.0/nnn  # x position of center
         g_axrat = gr_eq       # minor-to-major axis ratio
         g_pa = gr_pa          # major-axis position angle (degrees) c.c.w. from y axis
-        gpar = np.asarray([g_amp, g_sig, g_ycen, g_xcen, g_axrat, g_pa])
+        #gpar = np.asarray([g_amp, g_sig, g_ycen, g_xcen, g_axrat, g_pa])
+        gpar = np.asarray([g_ycen, g_xcen,g_axrat,g_amp,g_sig,g_pa])
+        #lgpars = np.asarray([ylcs,xlcs,qls,aps,l_sigs,phis])
         #----------------------------------------------
 
 
